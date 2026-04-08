@@ -5,10 +5,12 @@ Uses Claude to create high-quality (prompt, response) pairs
 that demonstrate how a skilled analyst thinks about revenue trends.
 
 Output: JSONL file where each line is a conversation in chat format.
+Each run also saves a config file so you can track what changed between runs.
 """
 
 import anthropic
 import json
+import hashlib
 from dotenv import load_dotenv
 from datetime import datetime
 
@@ -16,6 +18,12 @@ load_dotenv()
 
 client = anthropic.Anthropic()
 MODEL = "claude-sonnet-4-20250514"
+
+# --- Experiment versioning ---
+# Bump this every time you change scenarios or the system prompt.
+# The script saves a config snapshot with each run so you can
+# compare what changed and whether it improved quality.
+VERSION = "v1"
 
 # --- Revenue scenarios to generate training data for ---
 # Each scenario gives Claude enough context to produce a realistic,
@@ -118,6 +126,16 @@ Your analysis style:
 - Think in terms of what matters for the investment case, not academic analysis
 - Keep it under 400 words — this is a working analyst's note, not a research report"""
 
+# The user prompt template shapes what question the model sees.
+# {company}, {sector}, {revenue_table}, and {context} get filled in per scenario.
+USER_PROMPT_TEMPLATE = """Analyze the revenue trend for {company} ({sector}).
+
+{revenue_table}
+
+Additional context: {context}
+
+What's the story these numbers are telling? What would you want to dig into further?"""
+
 
 def format_revenue_table(revenue_data: dict) -> str:
     """Format revenue data as a readable table."""
@@ -131,13 +149,12 @@ def generate_user_prompt(scenario: dict) -> str:
     """Create the user question for a given scenario."""
     table = format_revenue_table(scenario["revenue_data"])
 
-    return f"""Analyze the revenue trend for {scenario['company']} ({scenario['sector']}).
-
-{table}
-
-Additional context: {scenario['context']}
-
-What's the story these numbers are telling? What would you want to dig into further?"""
+    return USER_PROMPT_TEMPLATE.format(
+        company=scenario["company"],
+        sector=scenario["sector"],
+        revenue_table=table,
+        context=scenario["context"],
+    )
 
 
 def generate_example(scenario: dict) -> dict:
@@ -166,16 +183,50 @@ def generate_example(scenario: dict) -> dict:
             "pattern": scenario["pattern"],
             "generated_at": datetime.now().isoformat(),
             "model": MODEL,
+            "version": VERSION,
         }
     }
 
 
+def save_run_config(run_dir: str, examples: list) -> None:
+    """Save a snapshot of everything that went into this generation run.
+
+    This is how you track what changed between runs. When you tweak
+    the system prompt or enrich a scenario's context, the config file
+    captures the before/after so you can compare results.
+    """
+    config = {
+        "version": VERSION,
+        "model": MODEL,
+        "system_prompt": SYSTEM_PROMPT,
+        "user_prompt_template": USER_PROMPT_TEMPLATE,
+        "scenarios": SCENARIOS,
+        "num_examples": len(examples),
+        "generated_at": datetime.now().isoformat(),
+        # Fingerprint lets you quickly check if inputs actually changed
+        "input_hash": hashlib.md5(
+            json.dumps({"system_prompt": SYSTEM_PROMPT,
+                         "user_prompt_template": USER_PROMPT_TEMPLATE,
+                         "scenarios": SCENARIOS},
+                       sort_keys=True).encode()
+        ).hexdigest(),
+    }
+
+    config_path = f"{run_dir}/config_{VERSION}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
+    with open(config_path, "w") as f:
+        json.dump(config, f, indent=2)
+
+    print(f"Run config saved to {config_path}")
+
+
 def main():
-    output_path = "data/raw/revenue_trend_analysis_v1.jsonl"
+    output_path = f"data/raw/revenue_trend_analysis_{VERSION}.jsonl"
+    run_dir = "runs"
     examples = []
 
     print(f"Generating {len(SCENARIOS)} training examples...")
-    print(f"Using model: {MODEL}")
+    print(f"Version: {VERSION}")
+    print(f"Model: {MODEL}")
     print()
 
     for i, scenario in enumerate(SCENARIOS):
@@ -184,18 +235,22 @@ def main():
         examples.append(example)
         print("done")
 
-    # Write to JSONL
+    # Write training data
     with open(output_path, "w") as f:
         for example in examples:
             f.write(json.dumps(example) + "\n")
 
     print(f"\nWrote {len(examples)} examples to {output_path}")
+
+    # Save run config for tracking
+    save_run_config(run_dir, examples)
+
     print(f"\nEstimated API cost: ~${len(examples) * 0.01:.2f}")
 
     # Print one example so you can review quality
-    print("\n" + "="*60)
+    print("\n" + "=" * 60)
     print("SAMPLE OUTPUT (first example):")
-    print("="*60)
+    print("=" * 60)
     print(f"\nCompany: {examples[0]['metadata']['company']}")
     print(f"Pattern: {examples[0]['metadata']['pattern']}")
     print(f"\nUSER PROMPT:\n{examples[0]['conversations'][1]['content'][:200]}...")
