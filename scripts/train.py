@@ -112,7 +112,7 @@ def main():
     print("\n[2/4] Loading training data...")
     dataset = load_dataset(
         "json",
-        data_files="data/curated/revenue_trend_analysis_v1.jsonl",
+        data_files="data/curated/extraction_v1.jsonl",
         split="train",
     )
     print(f"  Loaded {len(dataset)} training examples")

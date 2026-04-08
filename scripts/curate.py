@@ -4,25 +4,42 @@ Convert raw generated data into training-ready format for unsloth.
 Unsloth expects a HuggingFace Dataset with a specific chat format.
 This script reads our JSONL, validates it, and outputs a clean dataset.
 
-Usage: python scripts/curate.py
+Usage:
+  python scripts/curate.py                           # defaults to extraction data
+  python scripts/curate.py --task extraction
+  python scripts/curate.py --task revenue_trend
 """
 
 import json
-from datetime import datetime
+import sys
+
+
+TASKS = {
+    "extraction": {
+        "raw_path": "data/raw/extraction_v1.jsonl",
+        "output_path": "data/curated/extraction_v1.jsonl",
+        "min_assistant_words": 10,  # JSON output is compact
+    },
+    "revenue_trend": {
+        "raw_path": "data/raw/revenue_trend_analysis_v1.jsonl",
+        "output_path": "data/curated/revenue_trend_analysis_v1.jsonl",
+        "min_assistant_words": 50,
+    },
+}
 
 
 def load_raw_data(path: str) -> list:
     """Load examples from a JSONL file."""
     examples = []
     with open(path) as f:
-        for line_num, line in enumerate(f, 1):
+        for line in f:
             example = json.loads(line)
             examples.append(example)
     print(f"Loaded {len(examples)} examples from {path}")
     return examples
 
 
-def validate_example(example: dict) -> list:
+def validate_example(example: dict, min_words: int) -> list:
     """Check a single example for problems. Returns list of issues."""
     issues = []
     convos = example.get("conversations", [])
@@ -43,9 +60,9 @@ def validate_example(example: dict) -> list:
         if not turn.get("content", "").strip():
             issues.append(f"Empty content in {turn['role']} turn")
 
-    # Check assistant response length (too short = probably bad)
+    # Check assistant response length
     assistant_len = len(convos[2]["content"].split())
-    if assistant_len < 50:
+    if assistant_len < min_words:
         issues.append(f"Assistant response very short ({assistant_len} words)")
 
     return issues
@@ -73,25 +90,42 @@ def convert_to_training_format(examples: list) -> list:
 
 
 def main():
-    raw_path = "data/raw/revenue_trend_analysis_v1.jsonl"
-    output_path = "data/curated/revenue_trend_analysis_v1.jsonl"
+    # Parse task argument
+    task_name = "extraction"
+    for arg in sys.argv[1:]:
+        if arg.startswith("--task"):
+            continue
+        task_name = arg
+    if "--task" in sys.argv:
+        idx = sys.argv.index("--task")
+        if idx + 1 < len(sys.argv):
+            task_name = sys.argv[idx + 1]
+
+    if task_name not in TASKS:
+        print(f"Unknown task: {task_name}. Available: {list(TASKS.keys())}")
+        return
+
+    task = TASKS[task_name]
+    print(f"Task: {task_name}")
 
     # Load
-    examples = load_raw_data(raw_path)
+    examples = load_raw_data(task["raw_path"])
 
     # Validate
     print("\nValidating...")
     valid = []
     for i, example in enumerate(examples):
-        issues = validate_example(example)
-        company = example.get("metadata", {}).get("company", f"Example {i+1}")
+        issues = validate_example(example, task["min_assistant_words"])
+        # Try to get a label for the example
+        meta = example.get("metadata", {})
+        label = meta.get("company") or meta.get("sector") or f"Example {i+1}"
         if issues:
-            print(f"  SKIP: {company}")
+            print(f"  SKIP: {label}")
             for issue in issues:
                 print(f"    - {issue}")
         else:
             valid.append(example)
-            print(f"  OK:   {company}")
+            print(f"  OK:   {label}")
 
     print(f"\n{len(valid)}/{len(examples)} examples passed validation")
 
@@ -99,11 +133,11 @@ def main():
     training_data = convert_to_training_format(valid)
 
     # Write
-    with open(output_path, "w") as f:
+    with open(task["output_path"], "w") as f:
         for item in training_data:
             f.write(json.dumps(item) + "\n")
 
-    print(f"Wrote {len(training_data)} training examples to {output_path}")
+    print(f"Wrote {len(training_data)} training examples to {task['output_path']}")
 
     # Summary stats
     word_counts = []
