@@ -1,0 +1,37 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# Virtual environment
+venv/
+.venv/
+
+# Models (too large for git)
+*.bin
+*.safetensors
+*.gguf
+*.pt
+*.pth
+
+# Data (large files)
+data/raw/*.jsonl
+data/curated/*.jsonl
+data/preferences/*.jsonl
+
+# Training runs
+runs/
+
+# Environment
+.env
+.env.local
+
+# OS
+.DS_Store
+
+# IDE
+.vscode/
+.idea/

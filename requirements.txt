@@ -1,0 +1,10 @@
+# Data generation
+anthropic>=0.40.0
+
+# Data handling
+datasets>=3.0.0
+jsonlines>=4.0.0
+
+# Utilities
+python-dotenv>=1.0.0
+tqdm>=4.66.0
