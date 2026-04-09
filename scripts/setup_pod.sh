@@ -17,13 +17,12 @@ pip install unsloth datasets jsonlines python-dotenv tqdm 2>&1 | tail -3
 echo "[2/3] Fixing DPO dependencies..."
 pip install llm-blender mergekit 2>&1 | tail -1
 # Patch the broken import — find the file directly since we can't import it
-BLENDER_FILE=$(python -c "import site; print(site.getsitepackages()[0])")/llm_blender/blender/blender_utils.py
-if [ -f "$BLENDER_FILE" ]; then
-    sed -i 's/from transformers.utils.hub import TRANSFORMERS_CACHE/try:\n    from transformers.utils.hub import TRANSFORMERS_CACHE\nexcept ImportError:\n    TRANSFORMERS_CACHE = None/' "$BLENDER_FILE"
-    echo "  Patched llm_blender for transformers compatibility"
-else
-    echo "  llm_blender file not found at $BLENDER_FILE — skipping patch"
-fi
+SITE_PACKAGES=$(python -c "import site; print(site.getsitepackages()[0])")
+# Patch ALL llm_blender files with the broken import
+for f in $(find "$SITE_PACKAGES/llm_blender" -name "*.py" -exec grep -l "from transformers.utils.hub import TRANSFORMERS_CACHE" {} \; 2>/dev/null); do
+    sed -i 's/from transformers.utils.hub import TRANSFORMERS_CACHE/TRANSFORMERS_CACHE = None/' "$f"
+    echo "  Patched $f"
+done
 
 echo "[3/3] Verifying installation..."
 python -c "from unsloth import FastLanguageModel, PatchDPOTrainer; PatchDPOTrainer(); from trl import DPOTrainer, DPOConfig; print('  All imports OK')"
