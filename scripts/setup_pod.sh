@@ -14,8 +14,8 @@ pip install unsloth datasets jsonlines python-dotenv tqdm 2>&1 | tail -3
 
 # Install llm-blender with a fix for the transformers compatibility issue
 # trl >= 0.24 requires it, but it breaks with new transformers
-echo "[2/3] Fixing llm-blender compatibility..."
-pip install llm-blender 2>&1 | tail -1
+echo "[2/3] Fixing DPO dependencies..."
+pip install llm-blender mergekit 2>&1 | tail -1
 # Patch the broken import — find the file directly since we can't import it
 BLENDER_FILE=$(python -c "import site; print(site.getsitepackages()[0])")/llm_blender/blender/blender_utils.py
 if [ -f "$BLENDER_FILE" ]; then
