@@ -16,22 +16,14 @@ pip install unsloth datasets jsonlines python-dotenv tqdm 2>&1 | tail -3
 # trl >= 0.24 requires it, but it breaks with new transformers
 echo "[2/3] Fixing llm-blender compatibility..."
 pip install llm-blender 2>&1 | tail -1
-# Patch the broken import
-python -c "
-import llm_blender.blender.blender_utils as mod
-import inspect, pathlib
-src = pathlib.Path(inspect.getfile(mod))
-code = src.read_text()
-if 'TRANSFORMERS_CACHE' in code:
-    code = code.replace(
-        'from transformers.utils.hub import TRANSFORMERS_CACHE',
-        'try:\n    from transformers.utils.hub import TRANSFORMERS_CACHE\nexcept ImportError:\n    from transformers.utils import TRANSFORMERS_CACHE'
-    )
-    src.write_text(code)
-    print('  Patched llm_blender for transformers compatibility')
-else:
-    print('  llm_blender already compatible')
-"
+# Patch the broken import — find the file directly since we can't import it
+BLENDER_FILE=$(python -c "import site; print(site.getsitepackages()[0])")/llm_blender/blender/blender_utils.py
+if [ -f "$BLENDER_FILE" ]; then
+    sed -i 's/from transformers.utils.hub import TRANSFORMERS_CACHE/try:\n    from transformers.utils.hub import TRANSFORMERS_CACHE\nexcept ImportError:\n    TRANSFORMERS_CACHE = None/' "$BLENDER_FILE"
+    echo "  Patched llm_blender for transformers compatibility"
+else
+    echo "  llm_blender file not found at $BLENDER_FILE — skipping patch"
+fi
 
 echo "[3/3] Verifying installation..."
 python -c "from unsloth import FastLanguageModel, PatchDPOTrainer; PatchDPOTrainer(); from trl import DPOTrainer, DPOConfig; print('  All imports OK')"
