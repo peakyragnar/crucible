@@ -14,11 +14,12 @@ Usage: python scripts/train_dpo.py
 
 from unsloth import FastLanguageModel, PatchDPOTrainer
 from unsloth.chat_templates import get_chat_template
-from trl import DPOTrainer, DPOConfig
 from datasets import load_dataset
 
-# Patch DPO trainer for unsloth speed optimizations
+# Patch DPO trainer before importing it — this must happen first
 PatchDPOTrainer()
+
+from trl import DPOTrainer, DPOConfig  # noqa: E402
 
 # --- Model Configuration ---
 
