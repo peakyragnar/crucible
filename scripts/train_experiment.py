@@ -152,6 +152,8 @@ def main():
         "timestamp": datetime.now().isoformat(),
     }
 
+    import os
+    os.makedirs("runs", exist_ok=True)
     results_path = f"runs/experiment_{args.name}.json"
     with open(results_path, "w") as f:
         json.dump(experiment, f, indent=2)
