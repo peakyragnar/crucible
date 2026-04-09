@@ -10,6 +10,9 @@ build/
 venv/
 .venv/
 
+# uv
+.python-version
+
 # Models (too large for git)
 *.bin
 *.safetensors

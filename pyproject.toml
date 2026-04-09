@@ -1,0 +1,12 @@
+[project]
+name = "crucible"
+version = "0.1.0"
+description = "Frontier-to-open investment research model pipeline"
+requires-python = ">=3.10"
+dependencies = [
+    "anthropic>=0.40.0",
+    "datasets>=3.0.0",
+    "jsonlines>=4.0.0",
+    "python-dotenv>=1.0.0",
+    "tqdm>=4.66.0",
+]
