@@ -16,8 +16,8 @@ import sys
 
 TASKS = {
     "extraction": {
-        "raw_path": "data/raw/extraction_v1.jsonl",
-        "output_path": "data/curated/extraction_v1.jsonl",
+        "raw_path": "data/raw/extraction_combined_v2.jsonl",
+        "output_path": "data/curated/extraction_v2.jsonl",
         "min_assistant_words": 10,  # JSON output is compact
     },
     "revenue_trend": {
